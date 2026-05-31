@@ -11,9 +11,9 @@ import (
 
 type GitHubModule struct{}
 
-func (g GitHubModule) GetName() string        { return "github" }
+func (g GitHubModule) GetName()        string { return "github" }
 func (g GitHubModule) GetDescription() string { return "Fetches detailed metadata, SHAs, and resource links using the GitHub Search API" }
-func (g GitHubModule) GetType() string        { return "manual" }
+func (g GitHubModule) GetType()        string { return "manual" }
 
 type GitHubMetadata struct {
 	CommitsCount int               `json:"commits_count"`
@@ -31,7 +31,6 @@ func (g GitHubModule) Fetch(dateStr string, config types.DailiesConfig) (map[str
 		return nil, fmt.Errorf("missing 'github.username' or 'github.token' in config")
 	}
 
-	// Validate date format (YYYY-MM-DD)
 	_, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid date format: %w", err)
@@ -129,7 +128,6 @@ func (g GitHubModule) makeSearchRequest(ctx context.Context, url string, token s
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("User-Agent", "dailies-cli")
 
-	// Required custom media type header for the Commit Search API
 	req.Header.Set("Accept", "application/vnd.github.cloak-preview+json")
 
 	resp, err := http.DefaultClient.Do(req)

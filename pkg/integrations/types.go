@@ -15,5 +15,5 @@ type ManualIntegration interface {
 
 type IntegrationPayload struct {
 	Data      map[string]interface{} `json:"data"`
-	FetchedAt string								 `json:"fetched_at"`
+	FetchedAt string                 `json:"fetched_at"`
 }
