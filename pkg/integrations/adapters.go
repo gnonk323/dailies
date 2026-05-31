@@ -1,12 +1,16 @@
 package integrations
 
 import (
-	"fmt"
-	"sync"
 	"dailies/pkg/integrations/github"
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
+	"fmt"
+	"sync"
+	"time"
 )
+
+var mu sync.Mutex
+
 
 // register all integrations here so adapters can find them
 var IntegrationRegistry = map[string]Integration{
@@ -20,13 +24,13 @@ func RunManualFetch(integrationName string, dateStr string) {
 	settings, exists := config.Integrations[integrationName]
 	if !exists || !settings["enabled"] {
 		fmt.Printf("Integration '%s' is disabled or not declared in configuration.\n", integrationName)
-		return;
+		return
 	}
 
 	module, registered := IntegrationRegistry[integrationName]
 	if !registered || module.GetType() != "manual" {
 		fmt.Printf("Integration '%s' not found or is not configured as a manual type.\n", integrationName)
-		return;
+		return
 	}
 
 	manualModule := module.(ManualIntegration)
@@ -37,6 +41,14 @@ func RunManualFetch(integrationName string, dateStr string) {
 		fmt.Printf("Error pulling metrics via [%s]: %v\n", integrationName, err)
 		return
 	}
+
+	payload := IntegrationPayload{
+		Data:      fetchedData,
+		FetchedAt: time.Now().Format(time.RFC3339),
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	entry, err := storage.LoadEntry(dateStr)
 	if err != nil || entry == nil {
@@ -54,7 +66,7 @@ func RunManualFetch(integrationName string, dateStr string) {
 		entry.Integrations = make(map[string]interface{})
 	}
 
-	entry.Integrations[integrationName] = fetchedData
+	entry.Integrations[integrationName] = payload
 
 	if err := storage.SaveEntry(entry); err != nil {
 		fmt.Printf("Failed saving updated entry data logs for target key: %v\n", err)
