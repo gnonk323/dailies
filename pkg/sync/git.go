@@ -53,7 +53,7 @@ func SyncPush() error {
 	}
 
 	// commit changes
-	commitMsg := fmt.Sprintf("site: auto-sync daily logs - %s", time.Now().Format("2006-01-02 15:04"))
+	commitMsg := fmt.Sprintf("auto-sync daily logs - %s", time.Now().Format("2006-01-02 15:04"))
 	if err := exec.Command("git", "commit", "-m", commitMsg).Run(); err != nil {
 		return fmt.Errorf("failed to commit logs: %w", err)
 	}
