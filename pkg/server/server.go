@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 	"sort"
+	"log"
 	"dailies/pkg/integrations"
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
+	"dailies/pkg/sync"
 )
 
 //go:embed dist
@@ -154,6 +156,12 @@ func handleSaveEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to persist log data", http.StatusInternalServerError)
 		return
 	}
+
+	go func() {
+		if err := sync.SyncPush(); err != nil {
+			log.Printf("Background push sync failed: %v", err)
+		}
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

@@ -6,6 +6,7 @@ import (
 	"time"
 	"github.com/spf13/cobra"
 	"dailies/pkg/storage"
+	"dailies/pkg/sync"
 )
 
 var logCmd = &cobra.Command{
@@ -15,6 +16,10 @@ var logCmd = &cobra.Command{
 		if targetDate == "" {
 			targetDate = time.Now().Format("2006-01-02")
 		}
+
+		if err := sync.SyncPull(); err != nil {
+      fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
+    }
 
 		fmt.Printf("Logging for %s\n", targetDate)
 		existingEntry, _ := storage.LoadEntry(targetDate)
@@ -44,6 +49,10 @@ var logCmd = &cobra.Command{
 			return
 		}
 		fmt.Printf("\nLog written to disk at data/%s.json\n", targetDate)
+
+		if err := sync.SyncPush(); err != nil {
+      fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
+    }
 
 		handleInteractivePromotion("moods", coreAnswers.Moods)
 		handleInteractivePromotion("context_tags", coreAnswers.ContextTags)
