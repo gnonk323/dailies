@@ -1,31 +1,27 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"github.com/spf13/cobra"
+  "fmt"
+  "os"
+  "github.com/spf13/cobra"
+  "dailies/pkg/sync" 
 )
 
 var pullCmd = &cobra.Command{
-	Use:   "pull",
-	Short: "Pull the latest daily logs from the remote GitHub repository",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Fetching latest changes from remote...")
+  Use:   "pull",
+  Short: "Pull the latest daily logs from the remote GitHub repository",
+  Run: func(cmd *cobra.Command, args []string) {
+    fmt.Println("Checking for remote updates...")
 
-		gitCmd := exec.Command("git", "pull", "origin", "main")
-		gitCmd.Stdout = os.Stdout
-		gitCmd.Stderr = os.Stderr
+    if err := sync.SyncPull(); err != nil {
+      fmt.Printf("Error during pull sync: %v\n", err)
+      os.Exit(1)
+    }
 
-		if err := gitCmd.Run(); err != nil {
-			fmt.Printf("Error pulling data: %v\n", err)
-			return
-		}
-
-		fmt.Println("Data successfully synced from remote.")
-	},
+    fmt.Println("Data sync complete.")
+  },
 }
 
 func init() {
-	RootCmd.AddCommand(pullCmd)
+  RootCmd.AddCommand(pullCmd)
 }

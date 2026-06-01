@@ -7,16 +7,17 @@ import (
 	"os"
 	"os/exec"
 	"time"
-	"strconv"
+	// "strconv"
 	"dailies/pkg/storage"
 )
 
 func isGitEnabled() bool {
-	enabled, err := strconv.ParseBool(os.Getenv("AUTO_GIT"))
-	if err != nil {
-		return false
-	}
-	return enabled
+	// enabled, err := strconv.ParseBool(os.Getenv("AUTO_GIT"))
+	// if err != nil {
+	// 	return false
+	// }
+	// return enabled
+	return true
 }
 
 // SyncPull checks if we are behind remote and fast-forwards changes
