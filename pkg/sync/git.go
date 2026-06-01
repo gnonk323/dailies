@@ -16,7 +16,7 @@ func SyncPull() error {
 		return errors.New("failed to fetch from GitHub; check connection")
 	}
 
-	// check if local main is behind origin/main
+	// check if local master is behind origin/master
 	cmd := exec.Command("git", "rev-list", "HEAD..origin/master", "--count")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -26,7 +26,7 @@ func SyncPull() error {
 		// if there are incoming commits, fast-forward pull
 		if countStr != "0\n" && countStr != "" {
 			fmt.Println("Local data behind remote. Syncing down latest changes...")
-			pullCmd := exec.Command("git", "pull", "--ff-only", "origin", "main")
+			pullCmd := exec.Command("git", "pull", "--ff-only", "origin", "master")
 			pullCmd.Stdout = os.Stdout
 			pullCmd.Stderr = os.Stderr
 			if err := pullCmd.Run(); err != nil {
@@ -59,7 +59,7 @@ func SyncPush() error {
 	}
 
 	// push to remote
-	pushCmd := exec.Command("git", "push", "origin", "main")
+	pushCmd := exec.Command("git", "push", "origin", "master")
 	pushCmd.Stdout = os.Stdout
 	pushCmd.Stderr = os.Stderr
 	if err := pushCmd.Run(); err != nil {
