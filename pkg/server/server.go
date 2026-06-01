@@ -1,7 +1,10 @@
 package server
 
 import (
+	"embed"
 	"encoding/json"
+	"io/fs"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -11,6 +14,9 @@ import (
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
 )
+
+//go:embed dist
+var frontendFS embed.FS
 
 // enableCors sets up simple headers for local React development
 func enableCors(w http.ResponseWriter) {
@@ -29,6 +35,38 @@ func Start(port string) error {
 	mux.HandleFunc("POST /api/entries", handleSaveEntry)
 	mux.HandleFunc("POST /api/entries/{date}/fetch/{integration}", handleTriggerIntegration)
 
+	strippedFS, err := fs.Sub(frontendFS, "dist")
+	if err != nil {
+		return err
+	}
+	fileServer := http.FileServer(http.FS(strippedFS))
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		f, err := strippedFS.Open(strings.TrimPrefix(r.URL.Path, "/"))
+		if err == nil {
+			f.Close()
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// if the file doesn't exist, serve index.html
+		indexFile, err := strippedFS.Open("index.html")
+		if err != nil {
+			http.Error(w, "Frontend build not found", http.StatusNotFound)
+			return
+		}
+		defer indexFile.Close()
+
+		seeker, ok := indexFile.(io.ReadSeeker)
+		if !ok {
+			http.Error(w, "Internal server error: file not seekable", http.StatusInternalServerError)
+			return
+		}
+
+		stat, _ := indexFile.Stat()
+		http.ServeContent(w, r, "index.html", stat.ModTime(), seeker)
+	})
+
 	globalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		enableCors(w)
 		if r.Method == "OPTIONS" {
@@ -38,7 +76,7 @@ func Start(port string) error {
 		mux.ServeHTTP(w, r)
 	})
 
-	println("Server starting smoothly on http://localhost:" + port)
+	println("Server starting on http://localhost:" + port)
 	return http.ListenAndServe(":"+port, globalHandler)
 }
 
