@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"github.com/AlecAivazis/survey/v2"
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
+	"github.com/AlecAivazis/survey/v2"
 )
 
 func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
@@ -17,22 +17,40 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 	var defaultMoods []string
 	var defaultTags []string
 	var defaultJournal string
+	var leftoverMoods []string
+	var leftoverTags []string
 
 	if existing != nil {
 		defaultQuality = strconv.Itoa(existing.DayQuality)
 		defaultJournal = existing.Journal
+
+		// Sort existing moods into multi-select defaults vs custom text input fallbacks
 		for _, m := range existing.Moods {
+			matched := false
 			for _, am := range activeMoods {
 				if m == am {
 					defaultMoods = append(defaultMoods, m)
+					matched = true
+					break
 				}
 			}
+			if !matched {
+				leftoverMoods = append(leftoverMoods, m)
+			}
 		}
+
+		// Sort existing tags into multi-select defaults vs custom text input fallbacks
 		for _, t := range existing.ContextTags {
+			matched := false
 			for _, at := range activeTags {
 				if t == at {
 					defaultTags = append(defaultTags, t)
+					matched = true
+					break
 				}
+			}
+			if !matched {
+				leftoverTags = append(leftoverTags, t)
 			}
 		}
 	}
@@ -70,6 +88,7 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 		Name: "CustomMoods",
 		Prompt: &survey.Input{
 			Message: "Enter any custom or additional moods (comma-separated, or leave blank):",
+			Default: strings.Join(leftoverMoods, ", "),
 		},
 	})
 
@@ -88,6 +107,7 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 		Name: "CustomTags",
 		Prompt: &survey.Input{
 			Message: "Enter context tags for today (comma-separated, or leave blank):",
+			Default: strings.Join(leftoverTags, ", "),
 		},
 	})
 
