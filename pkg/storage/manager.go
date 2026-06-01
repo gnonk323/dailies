@@ -3,10 +3,11 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"os"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
+
 	"dailies/pkg/types"
 )
 
@@ -21,6 +22,19 @@ func GetConfigPath() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".dailies", "config.json")
+}
+
+func GetDataDirectory() string {
+	envPath := os.Getenv("DAILIES_DATA")
+	if envPath != "" {
+		if strings.HasPrefix(envPath, "~") {
+			home, _ := os.UserHomeDir()
+			return filepath.Join(home, envPath[1:])
+		}
+		return filepath.Clean(envPath)
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".dailies", "data")
 }
 
 func LoadConfig() types.DailiesConfig {
@@ -57,17 +71,12 @@ func SaveConfig(cfg types.DailiesConfig) error {
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		return err
 	}
-	
+
 	bytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(configPath, bytes, 0644)
-}
-
-func GetDataDirectory() string {
-	wd, _ := os.Getwd()
-	return filepath.Join(wd, "data")
 }
 
 func GetEntryPath(dateStr string) string {

@@ -3,24 +3,14 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
+	"strconv"
 	"time"
-
 	"dailies/pkg/storage"
 	"dailies/pkg/sync"
 	"dailies/pkg/types"
-
 	"github.com/spf13/cobra"
 )
-
-func isGitEnabled() bool {
-	enabled, err := strconv.ParseBool(os.Getenv("AUTO_GIT"))
-	if err != nil {
-		return false
-	}
-	return enabled
-}
 
 // Base log command (defaults to interactive mode if no subcommand is called)
 var logCmd = &cobra.Command{
@@ -31,12 +21,8 @@ Available subcommands: add, remove, set.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ensureTargetDate()
 
-		gitEnabled := isGitEnabled()
-
-		if gitEnabled {
-			if err := sync.SyncPull(); err != nil {
-				fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
-			}
+		if err := sync.SyncPull(); err != nil {
+			fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
 		}
 
 		fmt.Printf("Logging for %s\n", targetDate)
@@ -68,10 +54,8 @@ Available subcommands: add, remove, set.`,
 		}
 		fmt.Printf("Log written to disk at data/%s.json\n", targetDate)
 
-		if gitEnabled {
-			if err := sync.SyncPush(); err != nil {
-				fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
-			}
+		if err := sync.SyncPush(); err != nil {
+			fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
 		}
 
 		handleInteractivePromotion("moods", coreAnswers.Moods)
@@ -188,11 +172,8 @@ func ensureTargetDate() {
 func getOrCreateEntry() (*types.DailyEntry, error) {
 	ensureTargetDate()
 
-	gitEnabled := isGitEnabled()
-	if gitEnabled {
-		if err := sync.SyncPull(); err != nil {
-			fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
-		}
+	if err := sync.SyncPull(); err != nil {
+		fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
 	}
 
 	existingEntry, _ := storage.LoadEntry(targetDate)
@@ -212,12 +193,10 @@ func saveHeadless(entry *types.DailyEntry) error {
 	}
 	fmt.Printf("Log updated and written to disk at data/%s.json\n", targetDate)
 
-	gitEnabled := isGitEnabled()
-	if gitEnabled {
-		if err := sync.SyncPush(); err != nil {
-			fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
-		}
+	if err := sync.SyncPush(); err != nil {
+		fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
 	}
+	
 	return nil
 }
 
