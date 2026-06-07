@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"dailies/pkg/integrations/github"
+	"dailies/pkg/integrations/nyt"
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
 	"fmt"
@@ -15,6 +16,7 @@ var mu sync.Mutex
 // register all integrations here so adapters can find them
 var IntegrationRegistry = map[string]Integration{
 	"github": github.GitHubModule{},
+	"nyt":    nyt.NYTModule{},
 }
 
 

@@ -12,11 +12,16 @@ type GitHubConfig struct {
 	Token    string `json:"token"`
 }
 
+type NYTConfig struct {
+	Cookies string `json:"cookies"`
+} 
+
 type DailiesConfig struct {
 	Staging      map[string]string          `json:"staging,omitempty"`
 	WordBank     WordBank                   `json:"word_bank"`
 	Integrations map[string]map[string]bool `json:"integrations"`
 	GitHub       GitHubConfig								`json:"github"`
+	NYT          NYTConfig                  `json:"nyt"`
 }
 
 type DailyEntry struct {
