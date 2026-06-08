@@ -35,13 +35,13 @@ func (c ConnectionsFetcher) FetchGame(ctx context.Context, client *NYTClient, da
 		return nil, fmt.Errorf("connections base lookup failed with code %d", resp.StatusCode)
 	}
 
-	var basic ConnectionsBasicInfo
-	if err := json.NewDecoder(resp.Body).Decode(&basic); err != nil {
+	var basicInfo ConnectionsBasicInfo
+	if err := json.NewDecoder(resp.Body).Decode(&basicInfo); err != nil {
 		return nil, fmt.Errorf("failed decoding connections basic info: %w", err)
 	}
 
 	// grab the user's specific state for this puzzle
-	stateURL := "https://www.nytimes.com/svc/games/state/connections/latests"
+	stateURL := fmt.Sprintf("https://www.nytimes.com/svc/games/state/connections/latests?puzzle_ids=%d", basicInfo.ID)
 	stateResp, err := client.DoRequest(ctx, "GET", stateURL)
 	if err != nil {
 		return nil, err
@@ -52,19 +52,19 @@ func (c ConnectionsFetcher) FetchGame(ctx context.Context, client *NYTClient, da
 		return nil, fmt.Errorf("connections state endpoint failed with code %d", stateResp.StatusCode)
 	}
 
-	var statePayload ConnectionsStateResponse
-	if err := json.NewDecoder(stateResp.Body).Decode(&statePayload); err != nil {
+	var stateData ConnectionsStateResponse
+	if err := json.NewDecoder(stateResp.Body).Decode(&stateData); err != nil {
 		return nil, fmt.Errorf("failed decoding connections state body: %w", err)
 	}
 
-	if len(statePayload.States) == 0 {
+	if len(stateData.States) == 0 {
 		return map[string]interface{}{
-			"puzzle_id": basic.ID,
+			"puzzle_id": basicInfo.ID,
 		}, nil
 	}
 
 	return map[string]interface{}{
-		"puzzle_id": basic.ID,
-		"game_data": statePayload.States[0].GameData,
+		"puzzle_id": basicInfo.ID,
+		"game_data": stateData.States[0].GameData,
 	}, nil
 }

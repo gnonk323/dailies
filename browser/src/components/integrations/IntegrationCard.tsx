@@ -1,5 +1,6 @@
 import type { IntegrationPayload } from "@/types";
 import { GitHubCard } from "./GitHubCard";
+import { NYTCard } from "./NYTCard";
 import { GenericIntegrationCard } from "./GenericIntegrationCard";
 
 interface IntegrationCardProps {
@@ -14,6 +15,7 @@ const INTEGRATION_COMPONENTS: Record<
   React.ComponentType<{ payload: IntegrationPayload; onSync: () => void; isSyncing: boolean }>
 > = {
   github: GitHubCard,
+  nyt:    NYTCard,
 };
 
 export function IntegrationCard({ name, payload, onSync, isSyncing }: IntegrationCardProps) {

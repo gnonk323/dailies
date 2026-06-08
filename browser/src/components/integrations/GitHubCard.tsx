@@ -81,12 +81,12 @@ export function GitHubCard({ payload, onSync, isSyncing }: GitHubCardProps) {
           { label: "prs merged", val: prsMerged.length, icon: <GitPullRequestArrow /> },
           { label: "repos", val: repos.length, icon: <FolderRoot /> },
         ].map(({ label, val, icon }) => (
-          <div key={label} className="text-center">
+          <div key={label} className="text-center text-muted-foreground">
             <div className="flex items-center justify-center gap-2">
               {icon}
-              <div className="text-base font-medium leading-none">{val}</div>
+              <div className="font-medium leading-none text-foreground text-xl">{val}</div>
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5 text-center px-3">{label}</div>
+            <div className="text-[10px] mt-0.5 text-center px-3">{label}</div>
           </div>
         ))}
       </div>

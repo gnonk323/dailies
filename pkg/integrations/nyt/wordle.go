@@ -12,7 +12,8 @@ type WordleFetcher struct{}
 func (w WordleFetcher) GameKey() string { return "wordle" }
 
 type WordleBasicInfo struct {
-	ID int `json:"id"`
+	ID       int    `json:"id"`
+	Solution string `json:"solution"`
 }
 
 type WordleStateResponse struct {
@@ -60,11 +61,13 @@ func (w WordleFetcher) FetchGame(ctx context.Context, client *NYTClient, dateStr
 	if len(stateData.States) == 0 {
 		return map[string]interface{}{
 			"puzzle_id": basicInfo.ID,
+			"solution":  basicInfo.Solution,
 		}, nil
 	}
 
 	return map[string]interface{}{
 		"puzzle_id": basicInfo.ID,
+		"solution":  basicInfo.Solution,
 		"game_data": stateData.States[0].GameData,
 	}, nil
 }
