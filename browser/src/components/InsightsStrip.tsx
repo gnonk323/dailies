@@ -109,7 +109,7 @@ export function InsightsStrip({ entries }: { entries: DailyEntry[] }) {
             <div className="border bg-card rounded-lg p-3 space-y-2.5">
               <span className="text-xs font-medium text-muted-foreground">wordle</span>
 
-              <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 mt-2 text-center">
+              <div className="grid grid-cols-4 gap-3 mt-2 text-center">
                 <div>
                   <div className="text-base font-medium leading-none">{wordleTotal?.gamesPlayed ?? "—"}</div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">played</div>
@@ -147,7 +147,7 @@ export function InsightsStrip({ entries }: { entries: DailyEntry[] }) {
             <div className="border bg-card rounded-lg p-3 space-y-2.5">
               <span className="text-xs font-medium text-muted-foreground">connections</span>
 
-              <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 mt-2 text-center">
+              <div className="grid grid-cols-4 gap-3 mt-2 text-center">
                 <div>
                   <div className="text-base font-medium leading-none">{connections?.puzzles_completed ?? "—"}</div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">played</div>
