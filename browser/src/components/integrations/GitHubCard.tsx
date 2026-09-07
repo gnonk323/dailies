@@ -74,7 +74,7 @@ export function GitHubCard({ payload, onSync, isSyncing }: GitHubCardProps) {
         </Tooltip>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 justify-between md:justify-start">
         {[
           { label: "commits", val: data.commits_count ?? commits.length, icon: <GitCommitHorizontal /> },
           { label: "prs opened", val: prsOpened.length, icon: <GitPullRequestCreate /> },
@@ -86,7 +86,7 @@ export function GitHubCard({ payload, onSync, isSyncing }: GitHubCardProps) {
               {icon}
               <div className="font-medium leading-none text-foreground text-xl">{val}</div>
             </div>
-            <div className="text-[10px] mt-0.5 text-center px-3">{label}</div>
+            <div className="text-[10px] mt-0.5 text-center px-3 hidden md:block">{label}</div>
           </div>
         ))}
       </div>

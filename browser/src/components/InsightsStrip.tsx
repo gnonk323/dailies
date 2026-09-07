@@ -104,7 +104,7 @@ export function InsightsStrip({ entries }: { entries: DailyEntry[] }) {
       {nytSummary && (
         <>
           <span className="block text-[11px] font-semibold uppercase text-muted-foreground">NYT Games - all time</span>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
 
             <div className="border bg-card rounded-lg p-3 space-y-2.5">
               <span className="text-xs font-medium text-muted-foreground">wordle</span>

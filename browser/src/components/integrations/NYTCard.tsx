@@ -177,7 +177,7 @@ export function NYTCard({
 
       {!isEmpty && (
         <div className="flex flex-col gap-1">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* MINI CROSSWORD */}
             {hasMini && mini && (

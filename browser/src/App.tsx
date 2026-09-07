@@ -485,7 +485,7 @@ export default function DailiesPage() {
         {/* MAIN CONTENT */}
         <main className="flex-1 overflow-hidden min-w-0">
           <ScrollArea className="h-full">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-6">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-6 pb-12">
               {!isToday && (
                 <div className="flex">
                   <Button
