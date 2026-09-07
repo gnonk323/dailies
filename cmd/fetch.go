@@ -1,25 +1,34 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"time"
+
 	"github.com/spf13/cobra"
-	"dailies/pkg/integrations"
 )
 
 var integrationFlag string
 
 var fetchCmd = &cobra.Command{
 	Use:   "fetch",
-	Short: "Pull data from external integration points",
+	Short: "Pull data from external integration points via the dailies server",
 	Run: func(cmd *cobra.Command, args []string) {
 		if targetDate == "" {
 			targetDate = time.Now().Format("2006-01-02")
 		}
 
+		api := mustAPIClient()
 		if integrationFlag != "" {
-			integrations.RunManualFetch(integrationFlag, targetDate)
-		} else {
-			integrations.RunAllManualFetch(targetDate)
+			if _, err := api.FetchIntegration(targetDate, integrationFlag); err != nil {
+				fmt.Fprintf(os.Stderr, "Fetch failed: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+		if err := api.FetchAllIntegrations(targetDate); err != nil {
+			fmt.Fprintf(os.Stderr, "Fetch failed: %v\n", err)
+			os.Exit(1)
 		}
 	},
 }

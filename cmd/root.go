@@ -9,7 +9,7 @@ var targetDate string
 
 var RootCmd = &cobra.Command{
 	Use:   "dailies",
-	Short: "A local-first personal daily tracker CLI",
+	Short: "A personal daily tracker (CLI talks to the dailies server)",
 }
 
 func Execute() {

@@ -3,39 +3,42 @@ package server
 import (
 	"embed"
 	"encoding/json"
-	"io/fs"
 	"io"
+	"io/fs"
+	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
-	"sort"
-	"log"
+
 	"dailies/pkg/integrations"
 	"dailies/pkg/storage"
 	"dailies/pkg/types"
-	"dailies/pkg/sync"
 )
 
 //go:embed dist
 var frontendFS embed.FS
 
-// enableCors sets up simple headers for local React development
+type Server struct {
+	store storage.Store
+}
+
 func enableCors(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
 
-// Start spins up the REST server on the specified port
-func Start(port string) error {
+func Start(listenAddr string, store storage.Store) error {
+	s := &Server{store: store}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/config", handleGetConfig)
-	mux.HandleFunc("GET /api/entries", handleGetAllEntries)
-	mux.HandleFunc("GET /api/entries/{date}", handleGetEntry)
-	mux.HandleFunc("POST /api/entries", handleSaveEntry)
-	mux.HandleFunc("POST /api/entries/{date}/fetch/{integration}", handleTriggerIntegration)
+	mux.HandleFunc("GET /api/config", s.handleGetConfig)
+	mux.HandleFunc("POST /api/config", s.handleSaveConfig)
+	mux.HandleFunc("GET /api/entries", s.handleGetAllEntries)
+	mux.HandleFunc("GET /api/entries/{date}", s.handleGetEntry)
+	mux.HandleFunc("POST /api/entries", s.handleSaveEntry)
+	mux.HandleFunc("POST /api/entries/{date}/fetch", s.handleTriggerAllIntegrations)
+	mux.HandleFunc("POST /api/entries/{date}/fetch/{integration}", s.handleTriggerIntegration)
 
 	strippedFS, err := fs.Sub(frontendFS, "dist")
 	if err != nil {
@@ -51,7 +54,6 @@ func Start(port string) error {
 			return
 		}
 
-		// if the file doesn't exist, serve index.html
 		indexFile, err := strippedFS.Open("index.html")
 		if err != nil {
 			http.Error(w, "Frontend build not found", http.StatusNotFound)
@@ -78,54 +80,49 @@ func Start(port string) error {
 		mux.ServeHTTP(w, r)
 	})
 
-	println("Server starting on http://localhost:" + port)
-	return http.ListenAndServe(":"+port, globalHandler)
+	log.Printf("Server starting on http://%s", listenAddr)
+	return http.ListenAndServe(listenAddr, globalHandler)
 }
 
-// GET /api/config
-func handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	cfg := storage.LoadConfig()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cfg)
-}
-
-// GET /api/entries
-func handleGetAllEntries(w http.ResponseWriter, r *http.Request) {
-	dir := storage.GetDataDirectory()
-	files, err := os.ReadDir(dir)
+func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.store.LoadConfig()
 	if err != nil {
-		http.Error(w, "Unable to read data directory", http.StatusInternalServerError)
+		http.Error(w, "Failed to load config", http.StatusInternalServerError)
 		return
 	}
-
-	var allEntries []types.DailyEntry
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-			dateStr := strings.TrimSuffix(file.Name(), ".json")
-			entry, err := storage.LoadEntry(dateStr)
-			if err == nil && entry != nil {
-				allEntries = append(allEntries, *entry)
-			}
-		}
-	}
-
-	sort.Slice(allEntries, func(i, j int) bool {
-		return allEntries[i].Date > allEntries[j].Date
-	})
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(allEntries)
+	writeJSON(w, http.StatusOK, cfg)
 }
 
-// GET /api/entries/{date}
-func handleGetEntry(w http.ResponseWriter, r *http.Request) {
-	dateStr := r.PathValue("date") // works on Go 1.22+ standard routing
+func (s *Server) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg types.DailiesConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		http.Error(w, "Malformed JSON payload", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.SaveConfig(cfg); err != nil {
+		http.Error(w, "Failed to persist config", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (s *Server) handleGetAllEntries(w http.ResponseWriter, r *http.Request) {
+	allEntries, err := s.store.ListEntries()
+	if err != nil {
+		http.Error(w, "Unable to read entries", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, allEntries)
+}
+
+func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
+	dateStr := r.PathValue("date")
 	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
 		http.Error(w, "Invalid date syntax. Expecting YYYY-MM-DD", http.StatusBadRequest)
 		return
 	}
 
-	entry, err := storage.LoadEntry(dateStr)
+	entry, err := s.store.LoadEntry(dateStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -134,13 +131,10 @@ func handleGetEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Log entry not found", http.StatusNotFound)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(entry)
+	writeJSON(w, http.StatusOK, entry)
 }
 
-// POST /api/entries
-func handleSaveEntry(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSaveEntry(w http.ResponseWriter, r *http.Request) {
 	var entry types.DailyEntry
 	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
 		http.Error(w, "Malformed JSON payload", http.StatusBadRequest)
@@ -152,24 +146,31 @@ func handleSaveEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := storage.SaveEntry(&entry); err != nil {
+	if err := s.store.SaveEntry(&entry); err != nil {
 		http.Error(w, "Failed to persist log data", http.StatusInternalServerError)
 		return
 	}
 
-	go func() {
-		if err := sync.SyncPush(); err != nil {
-			log.Printf("Background push sync failed: %v", err)
-		}
-	}()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"status": "successfully written"})
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "successfully written"})
 }
 
-// POST /api/entries/{date}/fetch/{integration}
-func handleTriggerIntegration(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTriggerAllIntegrations(w http.ResponseWriter, r *http.Request) {
+	dateStr := r.PathValue("date")
+	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
+		http.Error(w, "Invalid date format", http.StatusBadRequest)
+		return
+	}
+
+	integrations.RunAllManualFetch(s.store, dateStr)
+	updatedEntry, err := s.store.LoadEntry(dateStr)
+	if err != nil {
+		http.Error(w, "Integration finished but failed reload", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, updatedEntry)
+}
+
+func (s *Server) handleTriggerIntegration(w http.ResponseWriter, r *http.Request) {
 	dateStr := r.PathValue("date")
 	integrationName := r.PathValue("integration")
 
@@ -178,23 +179,23 @@ func handleTriggerIntegration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Make sure the requested integration is valid
 	if _, ok := integrations.IntegrationRegistry[integrationName]; !ok {
 		http.Error(w, "Requested integration payload driver does not exist", http.StatusNotFound)
 		return
 	}
 
-	// Triggering your module synchronous runner safely
-	// Note: RunManualFetch saves internal records automatically via its internal storage triggers
-	integrations.RunManualFetch(integrationName, dateStr)
+	integrations.RunManualFetch(s.store, integrationName, dateStr)
 
-	// Fetch updated document version to yield back cleanly to React front-end
-	updatedEntry, err := storage.LoadEntry(dateStr)
+	updatedEntry, err := s.store.LoadEntry(dateStr)
 	if err != nil {
 		http.Error(w, "Integration finished but failed reload pipeline sequence", http.StatusInternalServerError)
 		return
 	}
+	writeJSON(w, http.StatusOK, updatedEntry)
+}
 
+func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedEntry)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(payload)
 }

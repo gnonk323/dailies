@@ -3,16 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
-	"dailies/pkg/storage"
-	"dailies/pkg/sync"
+
 	"dailies/pkg/types"
+
 	"github.com/spf13/cobra"
 )
 
-// Base log command (defaults to interactive mode if no subcommand is called)
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "Interactive prompt to create or append to today's data entry",
@@ -20,19 +19,31 @@ var logCmd = &cobra.Command{
 Available subcommands: add, remove, set.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ensureTargetDate()
-
-		if err := sync.SyncPull(); err != nil {
-			fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
-		}
+		api := mustAPIClient()
 
 		fmt.Printf("Logging for %s\n", targetDate)
-		existingEntry, _ := storage.LoadEntry(targetDate)
+		existingEntry, err := api.GetEntry(targetDate)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load entry: %v\n", err)
+			os.Exit(1)
+		}
 
 		if existingEntry != nil {
 			fmt.Printf("Found existing data log for %s. Pre-filling options...\n", targetDate)
 		}
 
-		coreAnswers, err := runInteractiveLog(existingEntry)
+		cfg, err := api.GetConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		entries, err := api.ListEntries()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load entries: %v\n", err)
+			os.Exit(1)
+		}
+
+		coreAnswers, err := runInteractiveLog(cfg, entries, existingEntry)
 		if err != nil {
 			if err.Error() == "interrupt" {
 				fmt.Println("\nOperation cancelled. Exiting...")
@@ -48,22 +59,17 @@ Available subcommands: add, remove, set.`,
 			coreAnswers.Integrations = existingEntry.Integrations
 		}
 
-		if err := storage.SaveEntry(coreAnswers); err != nil {
-			fmt.Println("Error writing entry to disk:", err)
+		if err := api.SaveEntry(coreAnswers); err != nil {
+			fmt.Println("Error saving entry:", err)
 			return
 		}
-		fmt.Printf("Log written to disk at data/%s.json\n", targetDate)
+		fmt.Printf("Log saved for %s\n", targetDate)
 
-		if err := sync.SyncPush(); err != nil {
-			fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
-		}
-
-		handleInteractivePromotion("moods", coreAnswers.Moods)
-		handleInteractivePromotion("context_tags", coreAnswers.ContextTags)
+		handleInteractivePromotion(api, cfg, entries, "moods", coreAnswers.Moods)
+		handleInteractivePromotion(api, cfg, entries, "context_tags", coreAnswers.ContextTags)
 	},
 }
 
-// 2. Subcommand: log add <field> <value>
 var logAddCmd = &cobra.Command{
 	Use:   "add [field] [value]",
 	Short: "Add an item to an array field (mood or context)",
@@ -94,7 +100,6 @@ var logAddCmd = &cobra.Command{
 	},
 }
 
-// 3. Subcommand: log remove <field> <value>
 var logRemoveCmd = &cobra.Command{
 	Use:   "remove [field] [value]",
 	Short: "Remove an item from an array field (mood or context)",
@@ -121,7 +126,6 @@ var logRemoveCmd = &cobra.Command{
 	},
 }
 
-// 4. Subcommand: log set <field> <value>
 var logSetCmd = &cobra.Command{
 	Use:   "set [field] [value]",
 	Short: "Set scalar text or rating fields (rating or journal)",
@@ -153,15 +157,11 @@ var logSetCmd = &cobra.Command{
 }
 
 func init() {
-	// Nest your subcommands under the base logCmd
 	logCmd.AddCommand(logAddCmd)
 	logCmd.AddCommand(logRemoveCmd)
 	logCmd.AddCommand(logSetCmd)
-
-	// Add logCmd to RootCmd
 	RootCmd.AddCommand(logCmd)
 }
-
 
 func ensureTargetDate() {
 	if targetDate == "" {
@@ -171,12 +171,10 @@ func ensureTargetDate() {
 
 func getOrCreateEntry() (*types.DailyEntry, error) {
 	ensureTargetDate()
-
-	if err := sync.SyncPull(); err != nil {
-		fmt.Printf("Sync Warning: %v\nProceeding with local files anyway...\n", err)
+	existingEntry, err := mustAPIClient().GetEntry(targetDate)
+	if err != nil {
+		return nil, err
 	}
-
-	existingEntry, _ := storage.LoadEntry(targetDate)
 	if existingEntry != nil {
 		return existingEntry, nil
 	}
@@ -188,15 +186,10 @@ func getOrCreateEntry() (*types.DailyEntry, error) {
 }
 
 func saveHeadless(entry *types.DailyEntry) error {
-	if err := storage.SaveEntry(entry); err != nil {
-		return fmt.Errorf("error writing entry to disk: %w", err)
+	if err := mustAPIClient().SaveEntry(entry); err != nil {
+		return fmt.Errorf("error saving entry: %w", err)
 	}
-	fmt.Printf("Log updated and written to disk at data/%s.json\n", targetDate)
-
-	if err := sync.SyncPush(); err != nil {
-		fmt.Printf("Sync Error: %v\nYour data is saved locally but not pushed.\n", err)
-	}
-	
+	fmt.Printf("Log updated for %s\n", targetDate)
 	return nil
 }
 

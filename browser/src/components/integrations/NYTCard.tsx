@@ -209,56 +209,62 @@ export function NYTCard({ payload, onSync, isSyncing }: NYTCardProps) {
                     onClick={() => goToPuzzle("connections")}
                   />
                 </div>
-                {connections.game_data.puzzleWon ? (
+                {connections.game_data?.puzzleWon ? (
                   <Badge variant="default" className="text-[10px]">won</Badge>
-                ) : (
+                ) : connections.game_data && (
                   <Badge variant={connections.game_data.puzzleComplete ? 'destructive' : 'outline'} className="text-[10px]">
                     {connections.game_data.puzzleComplete ? "failed" : `${4 - connections.game_data.mistakes} mistakes left`}
                   </Badge>
                 )}
               </div>
-              <div className="space-y-1 mt-2">
-                {connections.game_data.guesses.map((guess, guessIdx) => (
-                  <div className="flex items-center gap-1" key={guessIdx}>
-                    <div className="grid grid-cols-4 gap-1 flex-1 mr-2">
-                      {guess.cards.map((card, cardIdx) => (
-                        <div
-                          key={cardIdx}
-                          className={`h-6 rounded flex items-center justify-center transition-colors ${getConnectionsBgColor(card.level)}`}
-                        />
-                      ))}
-                    </div>
-                    {guess.correct
-                      ? <Check size={12} className="text-green-500 shrink-0" />
-                      : <X size={12} className="text-muted-foreground/40 shrink-0" />
-                    }
-                  </div>
-                ))}
-                <div className="mt-2 flex items-center gap-2">
-                  {([0, 1, 2, 3] as const).map((level) => {
-                    const solved = connections.game_data.solvedCategories.some(
-                      (cat) => cat.level === level
-                    );
-                    const colorClass = getConnectionsBgColor(level);
-                    const labels = ["yellow", "green", "blue", "purple"];
-                    return (
-                      <div key={level} className="flex items-center gap-1.5">
-                        <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${colorClass}`} />
-                        <span
-                          className={`text-[10px] ${
-                            solved
-                              ? "text-muted-foreground"
-                              : "text-muted-foreground/40 line-through"
-                          }`}
-                        >
-                          {labels[level]}
-                        </span>
-                        {solved && <Check size={9} className="text-green-500 shrink-0" />}
+              {connections.game_data ? (
+                <div className="space-y-1 mt-2">
+                  {connections.game_data.guesses.map((guess, guessIdx) => (
+                    <div className="flex items-center gap-1" key={guessIdx}>
+                      <div className="grid grid-cols-4 gap-1 flex-1 mr-2">
+                        {guess.cards.map((card, cardIdx) => (
+                          <div
+                            key={cardIdx}
+                            className={`h-6 rounded flex items-center justify-center transition-colors ${getConnectionsBgColor(card.level)}`}
+                          />
+                        ))}
                       </div>
-                    );
-                  })}
+                      {guess.correct
+                        ? <Check size={12} className="text-green-500 shrink-0" />
+                        : <X size={12} className="text-muted-foreground/40 shrink-0" />
+                      }
+                    </div>
+                  ))}
+                  <div className="mt-2 flex items-center gap-2">
+                    {([0, 1, 2, 3] as const).map((level) => {
+                      const solved = connections.game_data.solvedCategories.some(
+                        (cat) => cat.level === level
+                      );
+                      const colorClass = getConnectionsBgColor(level);
+                      const labels = ["yellow", "green", "blue", "purple"];
+                      return (
+                        <div key={level} className="flex items-center gap-1.5">
+                          <div className={`w-2.5 h-2.5 rounded-sm shrink-0 ${colorClass}`} />
+                          <span
+                            className={`text-[10px] ${
+                              solved
+                                ? "text-muted-foreground"
+                                : "text-muted-foreground/40 line-through"
+                            }`}
+                          >
+                            {labels[level]}
+                          </span>
+                          {solved && <Check size={9} className="text-green-500 shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-muted-foreground">Not yet played.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

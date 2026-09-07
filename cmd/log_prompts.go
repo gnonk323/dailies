@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"dailies/pkg/storage"
+
+	"dailies/pkg/client"
 	"dailies/pkg/types"
+
 	"github.com/AlecAivazis/survey/v2"
 )
 
-func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
-	activeMoods := GetQuickPicks("moods")
-	activeTags := GetQuickPicks("context_tags")
+func runInteractiveLog(cfg types.DailiesConfig, entries []types.DailyEntry, existing *types.DailyEntry) (*types.DailyEntry, error) {
+	activeMoods := GetQuickPicks(cfg, entries, "moods")
+	activeTags := GetQuickPicks(cfg, entries, "context_tags")
 
 	var defaultQuality string
 	var defaultMoods []string
@@ -24,7 +26,6 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 		defaultQuality = strconv.Itoa(existing.DayQuality)
 		defaultJournal = existing.Journal
 
-		// Sort existing moods into multi-select defaults vs custom text input fallbacks
 		for _, m := range existing.Moods {
 			matched := false
 			for _, am := range activeMoods {
@@ -39,7 +40,6 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 			}
 		}
 
-		// Sort existing tags into multi-select defaults vs custom text input fallbacks
 		for _, t := range existing.ContextTags {
 			matched := false
 			for _, at := range activeTags {
@@ -135,7 +135,6 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 
 	dq, _ := strconv.Atoi(answers.DayQuality)
 
-	// Combine dynamic and static items cleanly
 	moodMap := make(map[string]bool)
 	var finalMoods []string
 	for _, m := range answers.ChosenMoods {
@@ -180,8 +179,8 @@ func runInteractiveLog(existing *types.DailyEntry) (*types.DailyEntry, error) {
 	}, nil
 }
 
-func handleInteractivePromotion(field string, todaysWords []string) {
-	candidates := GetPromotionCandidates(field, todaysWords)
+func handleInteractivePromotion(api *client.APIClient, cfg types.DailiesConfig, entries []types.DailyEntry, field string, todaysWords []string) {
+	candidates := GetPromotionCandidates(cfg, entries, field, todaysWords)
 	if len(candidates) == 0 {
 		return
 	}
@@ -198,13 +197,15 @@ func handleInteractivePromotion(field string, todaysWords []string) {
 	}
 
 	if err := survey.AskOne(prompt, &chosen); err == nil && len(chosen) > 0 {
-		config := storage.LoadConfig()
 		if field == "moods" {
-			config.WordBank.Moods = append(config.WordBank.Moods, chosen...)
+			cfg.WordBank.Moods = append(cfg.WordBank.Moods, chosen...)
 		} else {
-			config.WordBank.ContextTags = append(config.WordBank.ContextTags, chosen...)
+			cfg.WordBank.ContextTags = append(cfg.WordBank.ContextTags, chosen...)
 		}
-		_ = storage.SaveConfig(config)
+		if err := api.SaveConfig(cfg); err != nil {
+			fmt.Printf("Failed to update word bank: %v\n", err)
+			return
+		}
 		fmt.Printf("Permanently added to config word_bank.%s: [%s]\n", field, strings.Join(chosen, ", "))
 	}
 }

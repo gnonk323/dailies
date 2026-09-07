@@ -1,6 +1,6 @@
 import type { DailyEntry, DailiesConfig } from '@/types';
 
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = '/api';
 
 export const api = {
   async getConfig(): Promise<DailiesConfig> {

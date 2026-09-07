@@ -1,16 +1,15 @@
 package cmd
 
 import (
-	"os"
 	"sort"
 	"strings"
-	"dailies/pkg/storage"
+
+	"dailies/pkg/types"
 )
 
-func GetQuickPicks(field string) []string {
-	config := storage.LoadConfig()
+func GetQuickPicks(config types.DailiesConfig, entries []types.DailyEntry, field string) []string {
 	maxWords := config.WordBank.MaxWords
-	
+
 	var historicalBank []string
 	if field == "moods" {
 		historicalBank = config.WordBank.Moods
@@ -22,7 +21,6 @@ func GetQuickPicks(field string) []string {
 		return historicalBank
 	}
 
-	dataDir := storage.GetDataDirectory()
 	frequencyMap := make(map[string]int)
 	recencyMap := make(map[string]string)
 
@@ -31,29 +29,20 @@ func GetQuickPicks(field string) []string {
 		recencyMap[word] = "0000-00-00"
 	}
 
-	files, err := os.ReadDir(dataDir)
-	if err == nil {
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-				dateStr := strings.TrimSuffix(file.Name(), ".json")
-				entry, err := storage.LoadEntry(dateStr)
-				if err == nil && entry != nil {
-					var words []string
-					if field == "moods" {
-						words = entry.Moods
-					} else {
-						words = entry.ContextTags
-					}
+	for _, entry := range entries {
+		var words []string
+		if field == "moods" {
+			words = entry.Moods
+		} else {
+			words = entry.ContextTags
+		}
 
-					for _, w := range words {
-						clean := strings.ToLower(strings.TrimSpace(w))
-						if _, exists := frequencyMap[clean]; exists {
-							frequencyMap[clean]++
-							if dateStr > recencyMap[clean] {
-								recencyMap[clean] = dateStr
-							}
-						}
-					}
+		for _, w := range words {
+			clean := strings.ToLower(strings.TrimSpace(w))
+			if _, exists := frequencyMap[clean]; exists {
+				frequencyMap[clean]++
+				if entry.Date > recencyMap[clean] {
+					recencyMap[clean] = entry.Date
 				}
 			}
 		}
@@ -77,10 +66,9 @@ func GetQuickPicks(field string) []string {
 	return keys
 }
 
-func GetPromotionCandidates(field string, todaysWords []string) []string {
-	config := storage.LoadConfig()
+func GetPromotionCandidates(config types.DailiesConfig, entries []types.DailyEntry, field string, todaysWords []string) []string {
 	threshold := config.WordBank.PromotionThreshold
-	
+
 	var historicalBank []string
 	if field == "moods" {
 		historicalBank = config.WordBank.Moods
@@ -88,9 +76,7 @@ func GetPromotionCandidates(field string, todaysWords []string) []string {
 		historicalBank = config.WordBank.ContextTags
 	}
 
-	dataDir := storage.GetDataDirectory()
-	files, err := os.ReadDir(dataDir)
-	if err != nil || len(todaysWords) == 0 {
+	if len(todaysWords) == 0 {
 		return []string{}
 	}
 
@@ -111,23 +97,17 @@ func GetPromotionCandidates(field string, todaysWords []string) []string {
 		return []string{}
 	}
 
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-			dateStr := strings.TrimSuffix(file.Name(), ".json")
-			entry, err := storage.LoadEntry(dateStr)
-			if err == nil && entry != nil {
-				var words []string
-				if field == "moods" {
-					words = entry.Moods
-				} else {
-					words = entry.ContextTags
-				}
-				for _, w := range words {
-					clean := strings.ToLower(strings.TrimSpace(w))
-					if _, exists := frequencyMap[clean]; exists {
-						frequencyMap[clean]++
-					}
-				}
+	for _, entry := range entries {
+		var words []string
+		if field == "moods" {
+			words = entry.Moods
+		} else {
+			words = entry.ContextTags
+		}
+		for _, w := range words {
+			clean := strings.ToLower(strings.TrimSpace(w))
+			if _, exists := frequencyMap[clean]; exists {
+				frequencyMap[clean]++
 			}
 		}
 	}

@@ -2,22 +2,30 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
+
+	"dailies/pkg/client"
+
 	"github.com/spf13/cobra"
-	"dailies/pkg/storage"
 )
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Prints today's local entry data summary inside the shell terminal console",
+	Short: "Prints today's entry data summary",
 	Run: func(cmd *cobra.Command, args []string) {
 		if targetDate == "" {
 			targetDate = time.Now().Format("2006-01-02")
 		}
 
-		entry, err := storage.LoadEntry(targetDate)
-		if err != nil || entry == nil {
+		api := mustAPIClient()
+		entry, err := api.GetEntry(targetDate)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load entry: %v\n", err)
+			os.Exit(1)
+		}
+		if entry == nil {
 			fmt.Printf("No entries tracked yet for %s. Fire up 'dailies log' to begin!\n", targetDate)
 			return
 		}
@@ -34,4 +42,13 @@ var statusCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(statusCmd)
+}
+
+func mustAPIClient() *client.APIClient {
+	api, err := client.NewFromEnv()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	return api
 }

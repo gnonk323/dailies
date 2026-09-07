@@ -12,16 +12,17 @@ import (
 
 var mu sync.Mutex
 
-
-// register all integrations here so adapters can find them
 var IntegrationRegistry = map[string]Integration{
 	"github": github.GitHubModule{},
 	"nyt":    nyt.NYTModule{},
 }
 
-
-func RunManualFetch(integrationName string, dateStr string) {
-	config := storage.LoadConfig()
+func RunManualFetch(store storage.Store, integrationName string, dateStr string) {
+	config, err := store.LoadConfig()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		return
+	}
 
 	settings, exists := config.Integrations[integrationName]
 	if !exists || !settings["enabled"] {
@@ -52,7 +53,7 @@ func RunManualFetch(integrationName string, dateStr string) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	entry, err := storage.LoadEntry(dateStr)
+	entry, err := store.LoadEntry(dateStr)
 	if err != nil || entry == nil {
 		entry = &types.DailyEntry{
 			Date:         dateStr,
@@ -70,15 +71,19 @@ func RunManualFetch(integrationName string, dateStr string) {
 
 	entry.Integrations[integrationName] = payload
 
-	if err := storage.SaveEntry(entry); err != nil {
+	if err := store.SaveEntry(entry); err != nil {
 		fmt.Printf("Failed saving updated entry data logs for target key: %v\n", err)
 		return
 	}
-	fmt.Printf("Cleanly merged [%s] metadata into data/%s.json\n", integrationName, dateStr)
+	fmt.Printf("Cleanly merged [%s] metadata into entry %s\n", integrationName, dateStr)
 }
 
-func RunAllManualFetch(dateStr string) {
-	config := storage.LoadConfig()
+func RunAllManualFetch(store storage.Store, dateStr string) {
+	config, err := store.LoadConfig()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		return
+	}
 	var enabledModules []string
 
 	for name, module := range IntegrationRegistry {
@@ -101,7 +106,7 @@ func RunAllManualFetch(dateStr string) {
 		wg.Add(1)
 		go func(integrationName string) {
 			defer wg.Done()
-			RunManualFetch(integrationName, dateStr)
+			RunManualFetch(store, integrationName, dateStr)
 		}(name)
 	}
 
