@@ -18,6 +18,8 @@ import (
 //go:embed dist
 var frontendFS embed.FS
 
+const secretSentinel = "__SECRET_REDACTED__"
+
 type Server struct {
 	store storage.Store
 }
@@ -44,6 +46,7 @@ func Start(listenAddr string, store storage.Store) error {
 	if err != nil {
 		return err
 	}
+
 	fileServer := http.FileServer(http.FS(strippedFS))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -73,10 +76,12 @@ func Start(listenAddr string, store storage.Store) error {
 
 	globalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		enableCors(w)
+
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
 		mux.ServeHTTP(w, r)
 	})
 
@@ -90,19 +95,43 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to load config", http.StatusInternalServerError)
 		return
 	}
+
+	// Never expose secrets through the API.
+	cfg.GitHub.Token = secretSentinel
+	cfg.NYT.Cookies = secretSentinel
+
 	writeJSON(w, http.StatusOK, cfg)
 }
 
 func (s *Server) handleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg types.DailiesConfig
+
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		http.Error(w, "Malformed JSON payload", http.StatusBadRequest)
 		return
 	}
+
+	// Preserve existing secrets when the client sends the sentinel returned
+	// by GET /api/config.
+	existing, err := s.store.LoadConfig()
+	if err != nil {
+		http.Error(w, "Failed to load existing config", http.StatusInternalServerError)
+		return
+	}
+
+	if cfg.GitHub.Token == secretSentinel {
+		cfg.GitHub.Token = existing.GitHub.Token
+	}
+
+	if cfg.NYT.Cookies == secretSentinel {
+		cfg.NYT.Cookies = existing.NYT.Cookies
+	}
+
 	if err := s.store.SaveConfig(cfg); err != nil {
 		http.Error(w, "Failed to persist config", http.StatusInternalServerError)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 
@@ -112,11 +141,13 @@ func (s *Server) handleGetAllEntries(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to read entries", http.StatusInternalServerError)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, allEntries)
 }
 
 func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
 	dateStr := r.PathValue("date")
+
 	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
 		http.Error(w, "Invalid date syntax. Expecting YYYY-MM-DD", http.StatusBadRequest)
 		return
@@ -127,15 +158,18 @@ func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	if entry == nil {
 		http.Error(w, "Log entry not found", http.StatusNotFound)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, entry)
 }
 
 func (s *Server) handleSaveEntry(w http.ResponseWriter, r *http.Request) {
 	var entry types.DailyEntry
+
 	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
 		http.Error(w, "Malformed JSON payload", http.StatusBadRequest)
 		return
@@ -156,17 +190,20 @@ func (s *Server) handleSaveEntry(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTriggerAllIntegrations(w http.ResponseWriter, r *http.Request) {
 	dateStr := r.PathValue("date")
+
 	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
 		http.Error(w, "Invalid date format", http.StatusBadRequest)
 		return
 	}
 
 	integrations.RunAllManualFetch(s.store, dateStr)
+
 	updatedEntry, err := s.store.LoadEntry(dateStr)
 	if err != nil {
 		http.Error(w, "Integration finished but failed reload", http.StatusInternalServerError)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, updatedEntry)
 }
 
@@ -191,6 +228,7 @@ func (s *Server) handleTriggerIntegration(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Integration finished but failed reload pipeline sequence", http.StatusInternalServerError)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, updatedEntry)
 }
 
