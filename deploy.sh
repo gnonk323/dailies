@@ -3,23 +3,25 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BROWSER_DIR="$ROOT/browser"
-DIST_DIR="$ROOT/pkg/server/dist"
 RELEASE_DIR="$ROOT/release"
 
-BINARY_NAME="dailies"
-BINARY_PATH="$RELEASE_DIR/${BINARY_NAME}-linux-amd64"
+REMOTE="gusmontana@dailies"
+REMOTE_TMP="~/dailies.new"
 
-echo "==> Cleaning previous release"
-rm -rf "$RELEASE_DIR"
-mkdir -p "$RELEASE_DIR"
+BINARY_NAME="dailies-linux-amd64"
+BINARY_PATH="$RELEASE_DIR/$BINARY_NAME"
 
 echo "==> Building frontend"
 cd "$BROWSER_DIR"
+
 npm ci
 npm run build
 
 echo "==> Building Linux AMD64 binary"
 cd "$ROOT"
+
+rm -rf "$RELEASE_DIR"
+mkdir -p "$RELEASE_DIR"
 
 GOOS=linux \
 GOARCH=amd64 \
@@ -30,18 +32,46 @@ go build \
   -o "$BINARY_PATH" \
   .
 
-echo "==> Verifying binary"
-file "$BINARY_PATH"
+echo "==> Built:"
+ls -lh "$BINARY_PATH"
+
+echo "==> Uploading binary to $REMOTE"
+scp "$BINARY_PATH" "$REMOTE:$REMOTE_TMP"
+
+echo "==> Installing binary and restarting service"
+
+ssh "$REMOTE" bash <<'EOF'
+set -euo pipefail
+
+REMOTE_TMP="$HOME/dailies.new"
+REMOTE_APP="/opt/dailies/dailies"
+
+echo "==> Installing new binary"
+
+sudo chmod 755 "$REMOTE_TMP"
+sudo chown dailies:dailies "$REMOTE_TMP"
+
+sudo mv "$REMOTE_TMP" "$REMOTE_APP"
+
+echo "==> Restarting dailies"
+
+sudo systemctl restart dailies
+
+sleep 1
+
+echo "==> Checking service"
+
+if ! sudo systemctl is-active --quiet dailies; then
+    echo "ERROR: dailies failed to start"
+    echo
+    sudo systemctl status dailies --no-pager
+    exit 1
+fi
+
+echo "==> Dailies is running"
+echo
+sudo systemctl status dailies --no-pager
+EOF
 
 echo
-echo "Release built:"
-echo "  $BINARY_PATH"
-echo
-echo "Frontend embedded into binary:"
-echo "  $DIST_DIR"
-echo
-echo "Size:"
-du -h "$BINARY_PATH"
-
-echo
-echo "Done."
+echo "Deployment successful"
